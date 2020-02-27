@@ -8,21 +8,19 @@ questions_ready = [
 ]
 
 def exercice_1(q1, q2, q3):
-	N = 100
-	w_size = 10
+	N = 200
+	y = utils.sample_ys(N)
 
 	print("Resolution de l'exercice 1 : ")
 	print("On considere le cas T -> +inf")
 
 	if q1 == 1:
 		print("\ta) on plot tau -> C_N(tau,x_1,x_5) sur l'intervalle [-200;200]")
-
-		tau = np.linspace(-200,200, 1000)[:,None,None]
+		tau = np.linspace(-200,200,500)
 		x_1 = utils.x[0]
-		x_5 = utils.x[-1]
-		y = utils.sample_ys(N)
+		x_5 = utils.x[4]
 		f = utils.C_N(tau, x_1, x_5, y, utils.c_0, utils.z_r, utils.sigma_r)
-		plt.plot(tau.flatten(), f, 'r-')
+		plt.plot(tau, f, 'r-')
 		plt.xlabel(r'$\tau$')
 		plt.ylabel(r'$C_N$')
 		plt.title(r'$\tau \rightarrow C_N(\tau,x_1,x_5)$')
@@ -34,14 +32,10 @@ def exercice_1(q1, q2, q3):
 		print("\ta) déjà fait")
 	if q2 == 1:
 		print("\tb) on plot l'image KM (voir enonce pour la definition)")
-		Im = np.zeros((2 * w_size + 1, 2 * w_size + 1))
-		y = utils.sample_ys(N)
-		for i in range(-w_size, w_size + 1):
-			for j in range(-w_size, w_size + 1):
-				if j == 0 and i%2 == 0:
-					print("\t\tcalcul en cours : " + str(int(100 * float(w_size + i ) / (2 * w_size + 1))) + '%')
-				y_s = utils.z_r + np.array([i,0,j])
-				Im[i + w_size, j + w_size] = utils.KM(y_s, utils.x, y, utils.c_0, utils.z_r, utils.sigma_r)
+		w_size = 10
+		dx = np.arange(2*w_size+1) - w_size
+		y_S = utils.z_r + [1, 0, 0] * dx[:,None] + [0, 0, 1] * dx[:,None,None]
+		Im = utils.KM(y_S, utils.x, y, utils.c_0, utils.z_r, utils.sigma_r)
 		plt.imshow(Im)
 		plt.savefig("figs/image KM de I_N.png")
 	elif q2 == 0:
@@ -101,9 +95,3 @@ def exercice_2(q1 = True, q2 = True, q3 = True):
 		print("\tc) ---skip---")
 	else:
 		print("\tc) déjà fait")
-
-
-
-
-
-

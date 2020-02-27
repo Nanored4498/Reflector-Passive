@@ -3,7 +3,7 @@ import os
 import warnings
 warnings.filterwarnings('ignore')
 
-def settup():
+def setup():
 	print("checking directories...\n")
 	l = os.listdir()
 	questions_to_do = ex.questions_ready

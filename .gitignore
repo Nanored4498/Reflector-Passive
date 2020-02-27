@@ -2,3 +2,4 @@
 figs
 *.DS_Store
 *.m
+__pycache__

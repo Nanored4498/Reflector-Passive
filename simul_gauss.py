@@ -7,4 +7,4 @@ def simul_1D_gaussian(n = 2**10, h = 0.05):
 	Yp = np.diff(Y)
 	tmp = np.fft.fft(np.fft.fftshift(C))
 	hat_f = np.sqrt(tmp) * np.fft.fft(Y)
-	return X, np.real(np.fft.ifft(hat_f))
+	return hat_f
