@@ -34,10 +34,15 @@ def exercice_1(q1, q2, q3):
 		print("\tb) on plot l'image KM (voir enonce pour la definition)")
 		w_size = 10
 		dx = np.arange(2*w_size+1) - w_size
-		y_S = utils.z_r + [1, 0, 0] * dx[:,None] + [0, 0, 1] * dx[:,None,None]
+		y_S = utils.z_r + [0, 0, 1] * dx[:,None] + [1, 0, 0] * dx[:,None,None]
 		Im = utils.KM(y_S, utils.x, y, utils.c_0, utils.z_r, utils.sigma_r)
 		plt.imshow(Im)
 		plt.savefig("figs/image KM de I_N.png")
+		plt.close()
+		Im2 = utils.KM(y_S, utils.x, y, utils.c_0, utils.z_r, 0)
+		plt.imshow(Im-Im2)
+		plt.savefig("figs/image KM de I_N-I_N0.png")
+		plt.close()
 	elif q2 == 0:
 		print("\tb) ---skip---")
 	else:
