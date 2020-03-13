@@ -7,9 +7,10 @@ questions_ready = [
 	[1, 0, 0]
 ]
 
+N = 200
+y = utils.sample_ys(N)
+
 def exercice_1(q1, q2, q3):
-	N = 200
-	y = utils.sample_ys(N)
 
 	print("Resolution de l'exercice 1 : ")
 	print("On considere le cas T -> +inf")
@@ -39,7 +40,7 @@ def exercice_1(q1, q2, q3):
 		plt.imshow(Im)
 		plt.savefig("figs/image KM de I_N.png")
 		plt.close()
-		Im2 = utils.KM(y_S, utils.x, y, utils.c_0, utils.z_r, 0)
+		Im2 = utils.KM(y_S, utils.x, y, utils.c_0, utils.z_r, 0.0)
 		plt.imshow(Im-Im2)
 		plt.savefig("figs/image KM de I_N-I_N0.png")
 		plt.close()
@@ -54,22 +55,21 @@ def exercice_1(q1, q2, q3):
 	else:
 		print("\tc) déjà fait")
 	print("\n")
+
+
 def exercice_2(q1 = True, q2 = True, q3 = True):
-	N = 100
 
 	print("Resolution de l'exercice 2 : ")
 	print("On considere le cas T < +inf")
 	if q1 == 1:
 		print("\ta) on plot tau -> C_NT(tau,x_5,x_1) sur l'intervalle [-150;150] pour différentes valeurs de T")
 		x = utils.x
-		y = utils.sample_ys(N)
-		z_r = utils.z_r
-		c_0 = utils.c_0
-		sigma_r = utils.sigma_r
 		tau_values = np.linspace(-150,150,200)
+		x_1 = utils.x[0]
+		x_5 = utils.x[4]
 		T_values = [500, 1000, 10000]
 		for T in T_values:
-			f = [utils.C_TNm(tau = tau, x_1 = x[0], x_2 = x[1], T = T, y = y, c_0 = c_0, z_r = z_r, sigma_r = sigma_r) for tau in tau_values]
+			f = [utils.C_TNm(tau, x_1, x_5, T, y, utils.c_0, utils.z_r, utils.sigma_r) for tau in tau_values]
 			plt.plot(tau_values, f, 'r-')
 			plt.xlabel(r'$\tau$')
 			plt.ylabel(r'$C_N$')
@@ -77,7 +77,7 @@ def exercice_2(q1 = True, q2 = True, q3 = True):
 			plt.savefig('figs/plot tau -> C_NT(tau,x_5,x_1) ' + str(T) + '.png')
 			plt.close()
 		print("on va maintenant calculer la moyenne des cross-correlations ")
-		f = [utils.C_TNM(M = 20, tau = tau, x_1 = x[0], x_2 = x[1], T = 500, y = y, c_0 = c_0, z_r = z_r, sigma_r = sigma_r) for tau in tau_values]
+		f = [utils.C_TNM(20, tau, x_1, x_5, 500, y, utils.c_0, utils.z_r, utils.sigma_r) for tau in tau_values]
 		plt.plot(tau_values, f, 'r-')
 		plt.xlabel(r'$\tau$')
 		plt.ylabel(r'$C_N$')
