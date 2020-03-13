@@ -65,7 +65,7 @@ def hat_G(omega, x, y, c_0, z_r, sigma_r):
 
 x = recevers_xs()
 c_0 = 1
-z_r = np.array([65,0,65])
+z_r = np.array([-5,0,65])
 sigma_r = 10**(-3)
 
 # TODO: Look at it
@@ -146,7 +146,7 @@ def KM(y_S, x, y, c_0, z_r, sigma_r):
 	precision = 1000
 	yS2 = y_S.reshape(-1, 3)
 	dist_yx = np.linalg.norm(yS2[:,None] - x, axis=-1)
-	tau = ((dist_yx[:,None] - dist_yx[:,:,None]) / c_0)[:,None]
+	tau = ((dist_yx[:,None] + dist_yx[:,:,None]) / c_0)[:,None]
 	omega = np.linspace(-alpha, alpha, precision)[:,None]
 	hat_G0_xY = hat_G0(omega[:,None], x[:,None], y, c_0).mean(-1)
 	hat_G0_xz = hat_G0(omega, x, z_r, c_0)
@@ -175,7 +175,13 @@ def C_TNM(M, tau, x_1, x_2, T, y, c_0, z_r, sigma_r):
 	CTNM = CTNM/M
 	return CTNM
 
-
+def etude_resolution(img):
+	"""
+	We have the same resolution study as for passive imaging (see section 2.3.9 in poly)
+	"""
+	img = np.power(img, 2)
+	R = np.max(img)/np.mean(img)
+	return R
 
 
 
