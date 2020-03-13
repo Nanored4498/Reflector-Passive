@@ -60,23 +60,20 @@ def hat_G(omega, x, y, c_0, z_r, sigma_r):
 	Output:
 		hat_G (np.array): value of the function hat_G
 	"""
-	hat_G = hat_G0(omega,x,y,c_0) + sigma_r * omega **2 * hat_G0(omega,x,z_r,c_0) * hat_G0(omega,z_r,y,c_0)
+	hat_G = hat_G0(omega,x,y,c_0) + sigma_r * omega**2 * hat_G0(omega,x,z_r,c_0) * hat_G0(omega,z_r,y,c_0)
 	return hat_G
 
-x = recevers_xs()
-c_0 = 1
-z_r = np.array([-5,0,65])
-sigma_r = 10**(-3)
-
-# TODO: Look at it
-def hat_n(omega):
+# TODO: Maybe a rescale
+def hat_n(omega, N):
 	"""
 	
 	"""
-	output = simul_1D_gaussian(n = len(omega), h = np.abs(omega[0] - omega[1]))
-	return output
+	fC = np.fft.ifftshift(np.exp(-omega**2))
+	Y = np.random.normal(loc=0.0, scale=1.0, size=(N, *omega.shape))
+	output = np.sqrt(fC) * np.fft.fft(Y)
+	return output.T
 
-def u(t, x, y, c_0, z_r, sigma_r):
+def u(t, omega, n, x, y, c_0, z_r, sigma_r):
 	"""
 	This function computes the recorded signal at x in time t
 
@@ -91,14 +88,12 @@ def u(t, x, y, c_0, z_r, sigma_r):
 	Output:
 		u_tx
 	"""
-	alpha = 10
-	precision = 1000
-	omega = np.linspace(-alpha, alpha, precision)[:,None]
-	G = hat_G(omega, x, y, c_0, z_r, sigma_r)
-	n = hat_n(omega)[:,None]
-	e = np.exp(-1.0j*omega*t)
-	u_tx = G * n * e
-	u_tx = u_tx.sum(axis = -1)/(2*np.pi*np.sqrt(len(y)))
+	assert n.shape[1] == y.shape[0]
+	G = hat_G(omega[:,None], x, y, c_0, z_r, sigma_r)
+	Gn = (G * n).sum(1)	# sum over y
+	t = np.expand_dims(t, -1)
+	u_tx = (Gn * np.exp(-1.0j*omega*t)).sum(-1) * (omega[1]-omega[0]) # integral over omega
+	u_tx /= (2*np.pi*np.sqrt(len(y)))
 	return u_tx
 
 def C_N(tau, x_1, x_2, y, c_0, z_r, sigma_r):
@@ -118,8 +113,8 @@ def C_N(tau, x_1, x_2, y, c_0, z_r, sigma_r):
 	Output:
 		C_N
 	"""
-	alpha = 4
-	precision = 1000
+	alpha = 4 # Bornes sur omega
+	precision = 1000 # nombre de omega
 	omega = np.linspace(-alpha, alpha, precision)
 	tau2 = tau.flatten()[:,None]
 	prodG = np.conj(hat_G(omega[:,None], x_1, y, c_0, z_r, sigma_r)) * hat_G(omega[:,None], x_2, y, c_0, z_r, sigma_r)
@@ -127,7 +122,7 @@ def C_N(tau, x_1, x_2, y, c_0, z_r, sigma_r):
 	C_N = C_N.sum(1) * (2*alpha/precision) / (2 * np.pi)
 	return C_N.reshape(tau.shape)
 
-def KM(y_S, x, y, c_0, z_r, sigma_r):
+def KM(y_S, x, y, c_0, z_r, sigma_r):	
 	"""
 	This function computes the value of a pixel of the KM image for exercise 1
 
@@ -155,18 +150,31 @@ def KM(y_S, x, y, c_0, z_r, sigma_r):
 	prodG = np.conj(hat_G_xY[:,:,None]) * hat_G_xY[:,None]
 	omega = omega[:,None]
 	C_N = np.exp(-omega**2) * prodG * np.exp(-1.0j * omega * tau)
-	I = np.real(C_N.sum((1, 2, 3)) / (2*np.pi) / (2*alpha/precision))
+	I = C_N.sum((1, 2, 3)).real * (omega[1]-omega[0]) / (2*np.pi)
 	return I.reshape(y_S.shape[:-1])
 
 def C_TNm(tau, x_1, x_2, T, y, c_0, z_r, sigma_r):
-	alpha = 10
-	precision = 1000
-	t = np.linspace(-alpha, alpha, precision)[:,None]
-	u_1 = u(t = t, x = x_1, y = y, c_0 = c_0, z_r = z_r, sigma_r = sigma_r)
-	u_2 = u(t = t + tau, x = x_2, y = y, c_0 = c_0, z_r = z_r, sigma_r = sigma_r)
-	C_TNm = u_1.sum(axis = -1) + u_2.sum(axis = -1)
-	C_TNm = C_TNm/(T - np.abs(tau))
-	return C_TNm
+	alpha_omega = 6
+	precision_omega = 500
+	precision_t = 800
+	omega = np.linspace(-alpha_omega, alpha_omega, precision_omega)
+
+	n = hat_n(omega, len(y))
+	G1 = hat_G(omega[:,None], x_1, y, c_0, z_r, sigma_r)
+	G2 = hat_G(omega[:,None], x_2, y, c_0, z_r, sigma_r)
+	Gn1 = (G1 * n).sum(1) / (2*np.pi*np.sqrt(len(y)))	# sum over y
+	Gn1 *= omega[1]-omega[0] # step size of the integration over omega
+	Gn2 = (G2 * n).sum(1) / (2*np.pi*np.sqrt(len(y)))	# sum over y
+	Gn2 *= omega[1]-omega[0] # step size of the integration over omega
+
+	output = []
+	for tt in tau:
+		print(tt)
+		t = np.linspace(0, T - tt, precision_t)[:,None]
+		u_1 = (Gn1 * np.exp(-1.0j*omega*t)).sum(-1)
+		u_2 = (Gn2 * np.exp(-1.0j*omega*(t + tt))).sum(-1)
+		output.append((u_1 * u_2).mean())
+	return np.array(output)
 
 def C_TNM(M, tau, x_1, x_2, T, y, c_0, z_r, sigma_r):
 	CTNM = C_TNm(tau, x_1, x_2, T, y, c_0, z_r, sigma_r)
