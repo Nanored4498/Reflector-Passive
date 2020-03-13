@@ -23,7 +23,13 @@ def exercice_1(q1, q2, q3):
 		plt.title(r'$\tau \rightarrow C_N(\tau,x_1,x_5)$')
 		plt.savefig('figs/plot tau -> C_N(tau,x_1,x_5).png')
 		plt.close()
-		
+		f = np.concatenate([f[:200], np.zeros(100), f[-200:]])
+		plt.plot(tau, f, 'r-')
+		plt.xlabel(r'$\tau$')
+		plt.ylabel(r'$C_N$')
+		plt.title(r'$\tau \rightarrow C_N(\tau,x_1,x_5)1_{\mathbb{R}\backslash[-50;50]}$')
+		plt.savefig('figs/plot troncated tau -> C_N(tau,x_1,x_5).png')
+		plt.close()
 	elif q1 == 0:
 		print("\ta) ---skip---")
 	else:
