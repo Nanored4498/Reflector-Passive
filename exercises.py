@@ -4,9 +4,10 @@ import matplotlib.pyplot as plt
 
 questions_ready = [[1, 1, 1],[1, 0, 0]]
 
+N = 200
+y = utils.sample_ys(N)
+
 def exercice_1(q1, q2, q3):
-	N = 200
-	y = utils.sample_ys(N)
 
 	print("Resolution de l'exercice 1 : ")
 	print("On considere le cas T -> +inf")
@@ -64,15 +65,13 @@ def exercice_1(q1, q2, q3):
 	else:
 		print("\tc) déjà fait")
 	print("\n")
-def exercice_2(q1 = True, q2 = True, q3 = True):
-	N = 100
 
+def exercice_2(q1 = True, q2 = True, q3 = True):
 	print("Resolution de l'exercice 2 : ")
 	print("On considere le cas T < +inf")
 	if q1 == 1:
 		print("\ta) on plot tau -> C_NT(tau,x_5,x_1) sur l'intervalle [-150;150] pour différentes valeurs de T")
 		x = utils.x
-		y = utils.sample_ys(N)
 		z_r = utils.z_r
 		c_0 = utils.c_0
 		sigma_r = utils.sigma_r
