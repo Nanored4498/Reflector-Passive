@@ -45,23 +45,14 @@ def exercice_1(q1, q2, q3):
 		Im = utils.KM(y_S, x, y, c_0, z_r, sigma_r)
 		plt.imshow(Im)
 		plt.savefig("figs/image KM de I_N.png")
-		plt.close()
-		Im2 = utils.KM(y_S, x, y, c_0, z_r, 0)
-		plt.imshow(Im-Im2)
-		plt.savefig("figs/image KM de I_N-I_N0.png")
-		plt.close()
 	elif q2 == 0:
 		print("\tb) ---skip---")
 	else:
 		print("\tb) déjà fait")
 	if q3 == 1:
 		print("\tc) On étudie les proprietes de resolution de l'image (voir rapport)")
-		img = plt.imread("figs/image KM de I_N.png")
-		R = utils.etude_resolution(img)
+		R = utils.etude_resolution(Im)
 		print("\tResolution de l'image KM de I_N : " + str(R))
-		img = plt.imread("figs/image KM de I_N-I_N0.png")
-		R = utils.etude_resolution(img)
-		print("\tResolution de l'image KM de I_N-I_N0 : " + str(R))
 	elif q3 == 0:
 		print("\tc) ---skip---")
 	else:
@@ -84,7 +75,7 @@ def exercice_2(q1 = True, q2 = True, q3 = True):
 			plt.savefig('figs/plot tau -> C_NT(tau,x_5,x_1) ' + str(T) + '.png')
 			plt.close()
 		print("on va maintenant calculer la moyenne des cross-correlations ")
-		f = utils.C_TNM(20, tau_values, x[0], x[1], 5000, y, c_0, z_r, sigma_r)
+		f = utils.C_TNM(20, tau_values, x[0], x[1], 10000, y, c_0, z_r, sigma_r)
 		plt.plot(tau_values, f, 'r-')
 		plt.xlabel(r'$\tau$')
 		plt.ylabel(r'$C_N$')
@@ -98,7 +89,13 @@ def exercice_2(q1 = True, q2 = True, q3 = True):
 	if q2 == 1:
 		print("\tb)")
 	elif q2 == 0:
-		print("\tb) ---skip---")
+		print("\tb) on plot l'image KM (voir enonce pour la definition)")
+		w_size = 10
+		dx = np.arange(2*w_size+1) - w_size
+		y_S = z_r + [0, 0, 1] * dx[:,None] + [1, 0, 0] * dx[:,None,None]
+		Im = utils.KMT(y_S, x, y, 8000, 10, c_0, z_r, sigma_r)
+		plt.imshow(Im)
+		plt.savefig("figs/image KM de I_NT.png")
 	else:
 		print("\tb) déjà fait")
 	if q3 == 1:

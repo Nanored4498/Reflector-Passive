@@ -1,4 +1,5 @@
 import numpy as np
+import pylab as pl
 from simul_gauss import simul_1D_gaussian
 
 def sample_ys(N):
@@ -68,9 +69,9 @@ def hat_n(omega, N):
 	"""
 	
 	"""
-	fC = np.fft.ifftshift(np.exp(-omega**2))
-	Y = np.random.normal(loc=0.0, scale=1.0, size=(N, *omega.shape))
-	output = np.sqrt(fC) * np.fft.fft(Y)
+	fC = np.exp(-omega**2)
+	Y = np.random.normal(size=(N, *omega.shape))
+	output = np.sqrt(fC) * np.fft.fftshift(np.fft.fft(Y))
 	return output.T
 
 def u(t, omega, n, x, y, c_0, z_r, sigma_r):
@@ -154,8 +155,8 @@ def KM(y_S, x, y, c_0, z_r, sigma_r):
 	return I.reshape(y_S.shape[:-1])
 
 def C_TNm(tau, x_1, x_2, T, y, c_0, z_r, sigma_r):
-	alpha_omega = 6
-	precision_omega = 500
+	alpha_omega = 4.5
+	precision_omega = 501
 	precision_t = 800
 	omega = np.linspace(-alpha_omega, alpha_omega, precision_omega)
 
@@ -169,11 +170,11 @@ def C_TNm(tau, x_1, x_2, T, y, c_0, z_r, sigma_r):
 
 	output = []
 	for tt in tau:
-		print(tt)
 		t = np.linspace(0, T - tt, precision_t)[:,None]
-		u_1 = (Gn1 * np.exp(-1.0j*omega*t)).sum(-1)
-		u_2 = (Gn2 * np.exp(-1.0j*omega*(t + tt))).sum(-1)
+		u_1 = (Gn1 * np.exp(-1.0j*omega*t)).sum(1).real
+		u_2 = (Gn2 * np.exp(-1.0j*omega*(t + tt))).sum(1).real
 		output.append((u_1 * u_2).mean())
+		print(tt)
 	return np.array(output)
 
 def C_TNM(M, tau, x_1, x_2, T, y, c_0, z_r, sigma_r):
@@ -191,9 +192,27 @@ def etude_resolution(img):
 	R = np.max(img)/np.mean(img)
 	return R
 
+def KMT(y_S, x, y, T, M, c_0, z_r, sigma_r):	
+	"""
+	This function computes the value of a pixel of the KM image for exercise 1
 
+	Args:
+		y_S (np.array): positions where we want to compute the KM image
+		x (np.array): positions of recepters
+		y (np.array): positions of noise sources
+		c_0 (float): velocity
+		z_r (np.array): position of the reflector
+		sigma_r (float): multiplicative constant of Taylors second order term
 
-
-
-
-
+	Output:
+		I_N(y_S)
+	"""
+	yS2 = y_S.reshape(-1, 3)
+	dist_xy = np.linalg.norm(yS2[:,None] - x, axis=-1).T
+	tau = ((dist_xy[None] + dist_xy[:,None]) / c_0)
+	I = np.zeros(yS2.shape[0])
+	for i in range(len(x)):
+		for j in range(len(x)):
+			print(tau.shape, I.shape)
+			I += C_TNM(M, tau[i,j], x[i], x[j], T, y, c_0, z_r, sigma_r)
+	return I.reshape(y_S.shape[:-1])
