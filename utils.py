@@ -174,7 +174,6 @@ def C_TNm(tau, x_1, x_2, T, y, c_0, z_r, sigma_r):
 		u_1 = (Gn1 * np.exp(-1.0j*omega*t)).sum(1).real
 		u_2 = (Gn2 * np.exp(-1.0j*omega*(t + tt))).sum(1).real
 		output.append((u_1 * u_2).mean())
-		print(tt)
 	return np.array(output)
 
 def C_TNM(M, tau, x_1, x_2, T, y, c_0, z_r, sigma_r):
