@@ -152,11 +152,8 @@ def C_TNm(tau, x_1, x_2, T, y, c_0, z_r, sigma_r):
 	G2 = hat_G(omega[:,None], x_2, y, c_0, z_r, sigma_r)
 	Gn1 = (G1 * n).sum(1) / (2*np.pi*np.sqrt(len(y)))	# sum over y
 	Gn2 = (G2 * n).sum(1) / (2*np.pi*np.sqrt(len(y)))	# sum over y
-	u1 = np.fft.fft(np.fft.ifftshift(Gn1))
-	u2 = np.fft.fft(np.fft.ifftshift(Gn2))
-	# pl.plot(u1)
-	# pl.plot(u2)
-	# pl.show()
+	u1 = np.fft.fft(np.fft.ifftshift(Gn1)).real
+	u2 = np.fft.fft(np.fft.ifftshift(Gn2)).real
 	t0 = int(-mi_tau/dt)
 	l0 = -mi_tau/dt - t0
 
@@ -169,8 +166,6 @@ def C_TNm(tau, x_1, x_2, T, y, c_0, z_r, sigma_r):
 		num_t = nt-t0-t1
 		t2 = t0 + int(nt+tau[i]/dt) - nt
 		l2 = t0 + tau[i]/dt - t2
-		print(t2, tau[i])
-		print(dt, t0, t1, mi_tau + (t0+0.5)*dt, T - (t1-0.5)*dt, T, nt)
 		u2t = (1-l2) * u2[t2:t2+num_t] + l2 * u2[t2+1:t2+1+num_t]
 		output[i] = ((u1t * u2t).sum() - l0*u1t[0]*u2t[0] - l1*u1t[-1]*u2t[-1]) / (num_t-l0-l1)
 	return np.array(output)
@@ -191,32 +186,35 @@ def etude_resolution(img):
 	return R
 
 def KMT(y_S, x, y, T, M, c_0, z_r, sigma_r):
-	alpha_omega = 4
-	precision_t = int((1.5*np.exp(-0.002*T) + 0.5)*T)
-	precision_omega = int((0.4*np.exp(-0.0001*T) + 0.3)*precision_t)
-	if precision_omega % 2 == 0: precision_omega += 1
-	omega = np.linspace(-alpha_omega, alpha_omega, precision_omega)
-	yS2 = y_S.reshape(-1, 3)
+	DW = 9 # range of omega
+	dt = 2*np.pi / DW # time step
+	nt = 1 + int(T / dt) # number of time steps
+	if nt % 2 == 0: nt += 1
+	dt = T / (nt - 1) 
+	dw = 2*np.pi / T # omega step
+	omega = np.linspace(-nt//2 * dw , nt//2 * dw, nt)
 
+	yS2 = y_S.reshape(-1, 3)
+	I = np.zeros(yS2.shape[0])
 	dist_xy = np.linalg.norm(yS2[:,None] - x, axis=-1).T
 	tau = ((dist_xy[None] + dist_xy[:,None]) / c_0)
-	dt = T / precision_t
-	t = np.linspace(0.5*dt, T+0.5*dt, precision_t+1)[:,None]
-
-	I = np.zeros(yS2.shape[0])
 	Gxwy = hat_G(omega[:,None,None], x[:,None], y, c_0, z_r, sigma_r).transpose(1, 0, 2)
-	Gxwy *= omega[1]-omega[0] # step size of the integration over omega
-	for _ in range(M):
-		nwy = hat_n(omega, len(y)) / alpha_omega ** 0.5
+
+	for m in range(M):
+		print(f'\rRealization: {m+1}/{M}', end='')
+		nwy = hat_n(omega, len(y)) * dw
 		Gnxw = (Gxwy * nwy).sum(2) / (2*np.pi*np.sqrt(len(y)))	# sum over y
-		u = (Gnxw[:,None] * np.exp(-1.0j*omega*t)).sum(2).real
+		u = np.fft.fft(np.fft.ifftshift(Gnxw))
 		for i in range(len(x)):
 			for j in range(len(x)):
 				for k in range(len(yS2)):
 					tau_k = tau[i,j,k]
-					d = int(tau_k/dt)
-					ld = abs(tau_k)/dt - d
-					num_t = precision_t - d
-					u2t = (1-ld) * u[j,d:-1] + ld * u[j,d+1:]
-					I[k] += ((u[i,:num_t] * u2t).sum() - ld * u[i,num_t-1] * u2t[-1]) / (num_t - ld)
+					t1 = int(tau_k/dt)
+					l1 = tau_k/dt - t1
+					num_t = nt-t1-1
+					u1t = u[i,:num_t]
+					u2t = (1-l1) * u[j,t1:t1+num_t] + l1 * u[j,t1+1:t1+1+num_t]
+					I[k] += ((u1t * u2t).sum() - l1*u1t[-1]*u2t[-1]) / (num_t-l1)
+	
+	print('', end='\r')
 	return I.reshape(y_S.shape[:-1])
