@@ -154,13 +154,14 @@ def KM(y_S, x, y, c_0, z_r, sigma_r):
 	I = C_N.sum((1, 2, 3)).real * (omega[1]-omega[0]) / (2*np.pi)
 	return I.reshape(y_S.shape[:-1])
 
-def C_TNm(tau, x_1, x_2, T, y, c_0, z_r, sigma_r):
+def C_TNm(tau, x_1, x_2, T, y, c_0, z_r, sigma_r, ):
 	alpha_omega = 4.5
-	precision_omega = 501
-	precision_t = 800
+	precision_t = int((1.4*np.exp(-0.002*T) + 0.6)*T)
+	precision_omega = int((0.4*np.exp(-0.0001*T) + 0.3)*precision_t)
+	if precision_omega % 2 == 0: precision_omega += 1
 	omega = np.linspace(-alpha_omega, alpha_omega, precision_omega)
 
-	n = hat_n(omega, len(y))
+	n = hat_n(omega, len(y)) * (2/alpha_omega) ** 0.5
 	G1 = hat_G(omega[:,None], x_1, y, c_0, z_r, sigma_r)
 	G2 = hat_G(omega[:,None], x_2, y, c_0, z_r, sigma_r)
 	Gn1 = (G1 * n).sum(1) / (2*np.pi*np.sqrt(len(y)))	# sum over y
@@ -168,18 +169,26 @@ def C_TNm(tau, x_1, x_2, T, y, c_0, z_r, sigma_r):
 	Gn2 = (G2 * n).sum(1) / (2*np.pi*np.sqrt(len(y)))	# sum over y
 	Gn2 *= omega[1]-omega[0] # step size of the integration over omega
 
-	output = []
-	for tt in tau:
-		t = np.linspace(0, T - tt, precision_t)[:,None]
-		u_1 = (Gn1 * np.exp(-1.0j*omega*t)).sum(1).real
-		u_2 = (Gn2 * np.exp(-1.0j*omega*(t + tt))).sum(1).real
-		output.append((u_1 * u_2).mean())
-		print(tt)
+	output = np.empty(tau.shape, float)
+	mi_tau = tau.min()
+	dt = T / precision_t
+	t = np.linspace(0.5*dt, T-0.5*dt, precision_t)[:,None]
+	u_1 = (Gn1 * np.exp(-1.0j*omega*t)).sum(1).real
+	t2 = mi_tau+0.5*dt + dt * np.arange(int((T - mi_tau) / dt) + 2)[:,None]
+	u_2 = (Gn2 * np.exp(-1.0j*omega*t2)).sum(1).real
+	for i in range(len(tau)):
+		d = int(abs(tau[i])/dt)
+		ld = abs(tau[i])/dt - d
+		num_t = precision_t - d
+		i0 = int((tau[i]-mi_tau)/dt)
+		l0 = (tau[i]-mi_tau)/dt - i0
+		u2t = (1-l0) * u_2[i0:i0+num_t] + l0 * u_2[i0+1:i0+1+num_t]
+		output[i] = ((u_1[:num_t] * u2t).sum() - ld * u_1[num_t-1] * u2t[-1]) / (num_t - ld)
 	return np.array(output)
 
 def C_TNM(M, tau, x_1, x_2, T, y, c_0, z_r, sigma_r):
-	CTNM = C_TNm(tau, x_1, x_2, T, y, c_0, z_r, sigma_r)
-	for i in range(M-1):
+	CTNM = 0
+	for i in range(M):
 		CTNM += C_TNm(tau, x_1, x_2, T, y, c_0, z_r, sigma_r)
 	CTNM = CTNM/M
 	return CTNM
@@ -192,27 +201,33 @@ def etude_resolution(img):
 	R = np.max(img)/np.mean(img)
 	return R
 
-def KMT(y_S, x, y, T, M, c_0, z_r, sigma_r):	
-	"""
-	This function computes the value of a pixel of the KM image for exercise 1
-
-	Args:
-		y_S (np.array): positions where we want to compute the KM image
-		x (np.array): positions of recepters
-		y (np.array): positions of noise sources
-		c_0 (float): velocity
-		z_r (np.array): position of the reflector
-		sigma_r (float): multiplicative constant of Taylors second order term
-
-	Output:
-		I_N(y_S)
-	"""
+def KMT(y_S, x, y, T, M, c_0, z_r, sigma_r):
+	alpha_omega = 4
+	precision_t = int((1.5*np.exp(-0.002*T) + 0.5)*T)
+	precision_omega = int((0.4*np.exp(-0.0001*T) + 0.3)*precision_t)
+	if precision_omega % 2 == 0: precision_omega += 1
+	omega = np.linspace(-alpha_omega, alpha_omega, precision_omega)
 	yS2 = y_S.reshape(-1, 3)
+
 	dist_xy = np.linalg.norm(yS2[:,None] - x, axis=-1).T
 	tau = ((dist_xy[None] + dist_xy[:,None]) / c_0)
+	dt = T / precision_t
+	t = np.linspace(0.5*dt, T+0.5*dt, precision_t+1)[:,None]
+
 	I = np.zeros(yS2.shape[0])
-	for i in range(len(x)):
-		for j in range(len(x)):
-			print(tau.shape, I.shape)
-			I += C_TNM(M, tau[i,j], x[i], x[j], T, y, c_0, z_r, sigma_r)
+	Gxwy = hat_G(omega[:,None,None], x[:,None], y, c_0, z_r, sigma_r).transpose(1, 0, 2)
+	Gxwy *= omega[1]-omega[0] # step size of the integration over omega
+	for _ in range(M):
+		nwy = hat_n(omega, len(y)) / alpha_omega ** 0.5
+		Gnxw = (Gxwy * nwy).sum(2) / (2*np.pi*np.sqrt(len(y)))	# sum over y
+		u = (Gnxw[:,None] * np.exp(-1.0j*omega*t)).sum(2).real
+		for i in range(len(x)):
+			for j in range(len(x)):
+				for k in range(len(yS2)):
+					tau_k = tau[i,j,k]
+					d = int(tau_k/dt)
+					ld = abs(tau_k)/dt - d
+					num_t = precision_t - d
+					u2t = (1-ld) * u[j,d:-1] + ld * u[j,d+1:]
+					I[k] += ((u[i,:num_t] * u2t).sum() - ld * u[i,num_t-1] * u2t[-1]) / (num_t - ld)
 	return I.reshape(y_S.shape[:-1])
