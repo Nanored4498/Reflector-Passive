@@ -45,6 +45,7 @@ def exercice_1(q1, q2, q3):
 		Im = utils.KM(y_S, x, y, c_0, z_r, sigma_r)
 		plt.imshow(Im)
 		plt.savefig("figs/image KM de I_N.png")
+		plt.close()
 	elif q2 == 0:
 		print("\tb) ---skip---")
 	else:

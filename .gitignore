@@ -3,3 +3,4 @@ figs
 *.DS_Store
 *.m
 __pycache__
+.ipynb_checkpoints
