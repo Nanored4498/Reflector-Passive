@@ -18,4 +18,7 @@ def setup():
 			questions_to_do[0][2] = -1
 		if 'plot tau -> C_NTM(tau,x_5,x_1) 10000.png' in l:
 			questions_to_do[1][0] = -1
+		if 'image KM de I_NT.png' in l:
+			questions_to_do[1][1] = -1
+			questions_to_do[1][2] = -1
 	return questions_to_do

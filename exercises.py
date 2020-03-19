@@ -102,7 +102,9 @@ def exercice_2(q1 = True, q2 = True, q3 = True):
 	else:
 		print("\tb) déjà fait")
 	if q3 == 1:
-		print("\tc)")
+		print("\tc) Resolution de l'image KM:")
+		R = utils.etude_resolution(Im)
+		print("\tResolution de l'image KM de I_NT: " + str(R))
 	elif q3 == 0:
 		print("\tc) ---skip---")
 	else:
