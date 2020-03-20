@@ -65,7 +65,6 @@ def hat_G(omega, x, y, c_0, z_r, sigma_r):
 	hat_G = hat_G0(omega,x,y,c_0) + sigma_r * omega**2 * hat_G0(omega,x,z_r,c_0) * hat_G0(omega,z_r,y,c_0)
 	return hat_G
 
-# TODO: Maybe a rescale
 def hat_n(omega, N):
 	"""
 	
@@ -136,46 +135,90 @@ def KM(y_S, x, y, c_0, z_r, sigma_r):
 	I = C_N.sum((1, 2, 3)).real * (omega[1]-omega[0]) / (2*np.pi)
 	return I.reshape(y_S.shape[:-1])
 
-def C_TNm(tau, x_1, x_2, T, y, c_0, z_r, sigma_r):
-	mi_tau = min(0, tau.min()-1)
+def get_omega(T, mi_tau=0):
 	DW = 9 # range of omega
 	dt = 2*np.pi / DW # time step
 	DT = T - mi_tau # range of time
 	nt = 1 + int(DT / dt) # number of time steps
 	if nt % 2 == 0: nt += 1
 	dt = DT / (nt - 1) 
-	dw = 2*np.pi / DT # omega step
-	omega = np.linspace(-nt//2 * dw , nt//2 * dw, nt)
+	dw = 2*np.pi / (nt*dt) # omega step
+	return np.linspace(-nt//2 * dw , nt//2 * dw, nt), dt
 
-	n = hat_n(omega, len(y)) * dw
-	G1 = hat_G(omega[:,None], x_1, y, c_0, z_r, sigma_r)
-	G2 = hat_G(omega[:,None], x_2, y, c_0, z_r, sigma_r)
-	Gn1 = (G1 * n).sum(1) / (2*np.pi*np.sqrt(len(y)))	# sum over y
-	Gn2 = (G2 * n).sum(1) / (2*np.pi*np.sqrt(len(y)))	# sum over y
-	u1 = np.fft.fft(np.fft.ifftshift(Gn1)).real
-	u2 = np.fft.fft(np.fft.ifftshift(Gn2)).real
-	t0 = int(-mi_tau/dt)
-	l0 = -mi_tau/dt - t0
-
-	output = np.empty(tau.shape, float)
-	for i in range(len(tau)):
-		t1 = int(abs(tau[i])/dt)
-		l1 = abs(tau[i])/dt - t1
-		t1 += 1
-		u1t = u1[t0:nt-t1]
-		num_t = nt-t0-t1
-		t2 = t0 + int(nt+tau[i]/dt) - nt
-		l2 = t0 + tau[i]/dt - t2
-		u2t = (1-l2) * u2[t2:t2+num_t] + l2 * u2[t2+1:t2+1+num_t]
-		output[i] = ((u1t * u2t).sum() - l0*u1t[0]*u2t[0] - l1*u1t[-1]*u2t[-1]) / (num_t-l0-l1)
+def C_TNm(tau, x_1, x_2, T, y, c_0, z_r, sigma_r, non_direct=False):
+	# Complexité O(T * (N + log T + n_tau))
+	output = np.zeros(tau.shape, float)
+	mi_tau = min(0, tau.min()-1)
+	omega, dt = get_omega(T, mi_tau)
+	nt = len(omega)
+	n = hat_n(omega, len(y)) * (omega[1] - omega[0])
+	if non_direct:
+		G1_r = sigma_r * omega[:,None]**2 * hat_G0(omega[:,None],x_1,z_r,c_0) * hat_G0(omega[:,None],z_r,y,c_0)
+		G2_r = sigma_r * omega[:,None]**2 * hat_G0(omega[:,None],x_2,z_r,c_0) * hat_G0(omega[:,None],z_r,y,c_0)
+		G1_d = hat_G0(omega[:,None],x_1,y,c_0)
+		G2_d = hat_G0(omega[:,None],x_2,y,c_0)
+		G1s, G2s = [G1_r, G1_d], [G2_d, G2_r]
+	else:
+		G1s = [hat_G(omega[:,None], x_1, y, c_0, z_r, sigma_r)]
+		G2s = [hat_G(omega[:,None], x_2, y, c_0, z_r, sigma_r)]
+	
+	for G1, G2 in zip(G1s, G2s):
+		Gn1 = (G1 * n).sum(1) / (2*np.pi*np.sqrt(len(y)))	# sum over y
+		Gn2 = (G2 * n).sum(1) / (2*np.pi*np.sqrt(len(y)))	# sum over y
+		u1 = np.fft.fft(np.fft.ifftshift(Gn1)).real
+		u2 = np.fft.fft(np.fft.ifftshift(Gn2)).real
+		t0 = int(-mi_tau/dt)
+		l0 = -mi_tau/dt - t0
+		for i in range(len(tau)):
+			t1 = int(abs(tau[i])/dt)
+			l1 = abs(tau[i])/dt - t1
+			t1 += 1
+			u1t = u1[t0:nt-t1]
+			num_t = nt-t0-t1
+			t2 = t0 + int(nt+tau[i]/dt) - nt
+			l2 = t0 + tau[i]/dt - t2
+			u2t = (1-l2) * u2[t2:t2+num_t] + l2 * u2[t2+1:t2+1+num_t]
+			output[i] += ((u1t * u2t).sum() - l0*u1t[0]*u2t[0] - l1*u1t[-1]*u2t[-1]) / (num_t-l0-l1)
 	return np.array(output)
 
-def C_TNM(M, tau, x_1, x_2, T, y, c_0, z_r, sigma_r):
-	CTNM = 0
-	for i in range(M):
-		CTNM += C_TNm(tau, x_1, x_2, T, y, c_0, z_r, sigma_r)
-	CTNM = CTNM/M
-	return CTNM
+def C_TNM(M, tau, x_1, x_2, T, y, c_0, z_r, sigma_r, non_direct=False):
+	# Complexité O(T * M * (N + log T + n_tau))
+	output = np.zeros(tau.shape, float)
+	mi_tau = min(0, tau.min()-1)
+	omega, dt = get_omega(T, mi_tau)
+	nt = len(omega)
+	t0 = int(-mi_tau/dt)
+	l0 = -mi_tau/dt - t0
+	if non_direct:
+		G1_r = sigma_r * omega[:,None]**2 * hat_G0(omega[:,None],x_1,z_r,c_0) * hat_G0(omega[:,None],z_r,y,c_0)
+		G2_r = sigma_r * omega[:,None]**2 * hat_G0(omega[:,None],x_2,z_r,c_0) * hat_G0(omega[:,None],z_r,y,c_0)
+		G1_d = hat_G0(omega[:,None],x_1,y,c_0)
+		G2_d = hat_G0(omega[:,None],x_2,y,c_0)
+		G1s, G2s = [G1_r, G1_d], [G2_d, G2_r]
+	else:
+		G1s = [hat_G(omega[:,None], x_1, y, c_0, z_r, sigma_r)]
+		G2s = [hat_G(omega[:,None], x_2, y, c_0, z_r, sigma_r)]
+	for m in range(M):
+		print(f'\rRealization: {m+1}/{M}', end='')
+		n = hat_n(omega, len(y)) * (omega[1] - omega[0])
+		for G1, G2 in zip(G1s, G2s):
+			Gn1 = (G1 * n).sum(1) / (2*np.pi*np.sqrt(len(y)))	# sum over y
+			Gn2 = (G2 * n).sum(1) / (2*np.pi*np.sqrt(len(y)))	# sum over y
+			u1 = np.fft.fft(np.fft.ifftshift(Gn1)).real
+			u2 = np.fft.fft(np.fft.ifftshift(Gn2)).real
+			for i in range(len(tau)):
+				t1 = int(abs(tau[i])/dt)
+				l1 = abs(tau[i])/dt - t1
+				t1 += 1
+				u1t = u1[t0:nt-t1]
+				num_t = nt-t0-t1
+				t2 = t0 + int(nt+tau[i]/dt) - nt
+				l2 = t0 + tau[i]/dt - t2
+				u2t = (1-l2) * u2[t2:t2+num_t] + l2 * u2[t2+1:t2+1+num_t]
+				output[i] += ((u1t * u2t).sum() - l0*u1t[0]*u2t[0] - l1*u1t[-1]*u2t[-1]) / (num_t-l0-l1)
+
+	print('', end='\r')
+	return output / M
 
 def etude_resolution(img):
 	"""
@@ -186,23 +229,19 @@ def etude_resolution(img):
 	return R
 
 def KMT(y_S, x, y, T, M, c_0, z_r, sigma_r):
-	DW = 9 # range of omega
-	dt = 2*np.pi / DW # time step
-	nt = 1 + int(T / dt) # number of time steps
-	if nt % 2 == 0: nt += 1
-	dt = T / (nt - 1) 
-	dw = 2*np.pi / T # omega step
-	omega = np.linspace(-nt//2 * dw , nt//2 * dw, nt)
-
+	# Complexité O(T * M * (N + log T + n_pixels))
 	yS2 = y_S.reshape(-1, 3)
 	I = np.zeros(yS2.shape[0])
 	dist_xy = np.linalg.norm(yS2[:,None] - x, axis=-1).T
 	tau = ((dist_xy[None] + dist_xy[:,None]) / c_0)
+	omega, dt = get_omega(T)
+	nt = len(omega)
 	Gxwy = hat_G(omega[:,None,None], x[:,None], y, c_0, z_r, sigma_r).transpose(1, 0, 2)
 
 	for m in range(M):
+		# O(T (N + log T + n_pixels))
 		print(f'\rRealization: {m+1}/{M}', end='')
-		nwy = hat_n(omega, len(y)) * dw
+		nwy = hat_n(omega, len(y)) * (omega[1] - omega[0])
 		Gnxw = (Gxwy * nwy).sum(2) / (2*np.pi*np.sqrt(len(y)))	# sum over y
 		u = np.fft.fft(np.fft.ifftshift(Gnxw))
 		for i in range(len(x)):
