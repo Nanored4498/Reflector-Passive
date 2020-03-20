@@ -1,6 +1,4 @@
 import numpy as np
-import pylab as pl
-from simul_gauss import simul_1D_gaussian
 import time
 
 def sample_ys(N):
@@ -35,8 +33,8 @@ def hat_G0(omega, x, y, c_0):
 
 	Args:
 		omega (np.array): angular frequency
-		x (np.array): inputs of the Green function
-		y (np.array): inputs of the Green function
+		x (np.array): first positions
+		y (np.array): second positions
 		c_0 (float): celerity
 
 	Output:
@@ -53,9 +51,9 @@ def hat_G(omega, x, y, c_0, z_r, sigma_r):
 
 	Args:
 		omega (np.array): angular frequency
-		x (np.array): inputs of the Green function
-		y (np.array): inputs of the Green function
-		c_0 (float): velocity
+		x (np.array): first positions
+		y (np.array): second positions
+		c_0 (float): celerity
 		z_r (np.array): reflector position
 		sigma_r (float): multiplicative constant of Taylors second order term
 
@@ -67,7 +65,16 @@ def hat_G(omega, x, y, c_0, z_r, sigma_r):
 
 def hat_n(omega, N):
 	"""
-	
+	Simulate the Fourier transform of N gaussian processes with zero mean and a correlation
+	with a Fourier transform : exp(-omega^2)
+
+	Args:
+		omega (np.array): angular frequency
+		N (int): number of gaussian processes to simulate
+
+	Output:
+		hat_n (np.array): values of the Fourier transform at omega for N different gaussian processes
+							shape (len(omega), N)
 	"""
 	fC = np.exp(-omega**2)
 	Y = np.random.normal(size=(len(omega), N))*(len(omega))**0.5/2 + 0j
@@ -80,7 +87,7 @@ def hat_n(omega, N):
 
 def C_N(tau, x_1, x_2, y, c_0, z_r, sigma_r):
 	"""
-	This function computes the cross correlation of the signals recorded at two
+	This function computes the expectation of the cross correlation of the signals recorded at two
 	distinct locations.
 
 	Args:
@@ -93,7 +100,7 @@ def C_N(tau, x_1, x_2, y, c_0, z_r, sigma_r):
 		sigma_r (float): multiplicative constant of Taylors second order term
 
 	Output:
-		C_N
+		C_N (np.array): same shape as tau. Correlation
 	"""
 	alpha = 4 # Bornes sur omega
 	precision = 1000 # nombre de omega
@@ -104,7 +111,7 @@ def C_N(tau, x_1, x_2, y, c_0, z_r, sigma_r):
 	C_N = C_N.sum(1) * (2*alpha/precision) / (2 * np.pi)
 	return C_N.reshape(tau.shape)
 
-def KM(y_S, x, y, c_0, z_r, sigma_r):	
+def KM(y_S, x, y, c_0, z_r, sigma_r):
 	"""
 	This function computes the value of a pixel of the KM image for exercise 1
 
@@ -117,7 +124,7 @@ def KM(y_S, x, y, c_0, z_r, sigma_r):
 		sigma_r (float): multiplicative constant of Taylors second order term
 
 	Output:
-		I_N(y_S)
+		I_N(y_S) (np.array): same shape as y_S
 	"""
 	alpha = 4
 	precision = 1000
@@ -136,6 +143,17 @@ def KM(y_S, x, y, c_0, z_r, sigma_r):
 	return I.reshape(y_S.shape[:-1])
 
 def get_omega(T, mi_tau=0):
+	"""
+	compute an array of omega values and a time step associated, in order to compute
+	a signal via a Fourier transform in the range [mi_tau, T]
+
+	Args:
+		T (float): time maximum
+		mi_tau (float): time minimum
+
+	Output:
+		omega, dt (np.array, float): an array of values omega equally spaced, and time step associated
+	"""
 	DW = 9 # range of omega
 	dt = 2*np.pi / DW # time step
 	DT = T - mi_tau # range of time
@@ -146,6 +164,25 @@ def get_omega(T, mi_tau=0):
 	return np.linspace(-nt//2 * dw , nt//2 * dw, nt), dt
 
 def C_TNm(tau, x_1, x_2, T, y, c_0, z_r, sigma_r, non_direct=False):
+	"""
+	This function computes the empirical cross correlation of the signals recorded at two
+	distinct locations up to time T
+
+	Args:
+		tau (float): temporal lag
+		x_1 (np.array): position of the first recepter
+		x_2 (np.array): position of the second recepter
+		T (float): time maximum
+		y (np.array): position of noise sources
+		c_0 (float): celerity
+		z_r (np.array): reflector position
+		sigma_r (float): multiplicative constant of Taylors second order term
+		non_direct (bool, optional): if true return the correlation between a direct wave and a reflected 
+						one without taking into account the correlation between the direct waves
+
+	Output:
+		C_TN (np.array): same shape as tau. Correlation
+	"""
 	# Complexité O(T * (N + log T + n_tau))
 	output = np.zeros(tau.shape, float)
 	mi_tau = min(0, tau.min()-1)
@@ -182,6 +219,26 @@ def C_TNm(tau, x_1, x_2, T, y, c_0, z_r, sigma_r, non_direct=False):
 	return np.array(output)
 
 def C_TNM(M, tau, x_1, x_2, T, y, c_0, z_r, sigma_r, non_direct=False):
+	"""
+	This function computes an average empirical cross correlation of the signals recorded at two
+	distinct locations up to time T
+
+	Args:
+		M (int): number of realizations to use for the average
+		tau (float): temporal lag
+		x_1 (np.array): position of the first recepter
+		x_2 (np.array): position of the second recepter
+		T (float): time maximum
+		y (np.array): position of noise sources
+		c_0 (float): celerity
+		z_r (np.array): reflector position
+		sigma_r (float): multiplicative constant of Taylors second order term
+		non_direct (bool, optional): if true return the correlation between a direct wave and a reflected 
+						one without taking into account the correlation between the direct waves
+
+	Output:
+		C_TNM (np.array): same shape as tau. Correlation
+	"""
 	# Complexité O(T * M * (N + log T + n_tau))
 	output = np.zeros(tau.shape, float)
 	mi_tau = min(0, tau.min()-1)
@@ -229,6 +286,22 @@ def etude_resolution(img):
 	return R
 
 def KMT(y_S, x, y, T, M, c_0, z_r, sigma_r):
+	"""
+	This function computes the value of a pixel of the KM image for exercise 2
+
+	Args:
+		y_S (np.array): positions where we want to compute the KM image
+		x (np.array): positions of recepters
+		y (np.array): positions of noise sources
+		T (float): maximal time
+		M (int): number of realizations to use for the average
+		c_0 (float): velocity
+		z_r (np.array): position of the reflector
+		sigma_r (float): multiplicative constant of Taylors second order term
+
+	Output:
+		I_TNM(y_S) (np.array): same shape as y_S
+	"""
 	# Complexité O(T * M * (N + log T + n_pixels))
 	yS2 = y_S.reshape(-1, 3)
 	I = np.zeros(yS2.shape[0])
